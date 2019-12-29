@@ -210,7 +210,6 @@ teleporter.entityType = new Prov({
     get: ()=>a.newEntity()
 })
 
-teleporter.name = "Teleporter"
 teleporter.description = "Advanced item transport block. Teleporters input items to other teleporters of the same color. Does nothing if no teleporters of the same color exist. If multiple teleporters exist of the same color, items are distributed evenly. Tap to change color."
 
 
