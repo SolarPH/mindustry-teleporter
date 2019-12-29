@@ -57,7 +57,9 @@ function entity(a) {
         var initialized = false;
         var offset = 0;
         var registry = -1;
-        var initialized = false
+        var initialized = false;
+        var lastCachedTime = 0;
+        var accepts = {}
         entities[entity.id] = {
             realEntity: entity,
             
@@ -69,18 +71,29 @@ function entity(a) {
             },
             id() {return entity.id},
             tryToOutput(item, forReal) {
+                if (Time.time() === lastCachedTime) {
+                    if (targets[item.id] === null) return false
+                } else {
+                    targets = {}
+                }
+                
                 var proximity = entity.proximity();
-                for (var i = 0; i < proximity.size; i++) {
-                    var target = proximity.get((offset + i) % proximity.size)
+                const size = proximity.size;
+                for (var i = 0; i < size; i++) {
+                    var target = proximity.get((offset + i) % size)
                     
                     if (!target.block().instantTransfer && target.block().acceptItem(item, target, entity.tile)) {
                         if (forReal) {
                             target.block().handleItem(item, target, entity.tile);
                             offset += i + 1
+                        } else {
+                            offset += i
                         }
                         return true
                     }
                 }
+                lastCachedTime = Time.time();
+                targets[item.id] = null;
                 return false
             },
             
@@ -128,7 +141,9 @@ function Block__tryToOutput(item, myTile, forReal) {
         
         if (teleporter.tryToOutput(item, forReal)) {
             if (forReal) {
-                color.offset = i + color.offset + 1;
+                color.offset += i + 1;
+            } else {
+                color.offset +=i 
             }
             return true;
         }
@@ -165,8 +180,6 @@ const teleporter = extendContent(Block, "teleporter", {
     },
     configured (tile, player, value){
         entity(tile).colorCode(value)
-        
-        print (entity(tile).colorCode())
     },
     
     buildConfiguration(tile, table) {
