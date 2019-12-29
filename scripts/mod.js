@@ -71,10 +71,10 @@ function entity(a) {
             },
             id() {return entity.id},
             tryToOutput(item, forReal) {
-                if (Time.time() === lastCachedTime && targets[item.id] === null) {
+                if (Time.time() === lastCachedTime && accepts[item.id] === false) {
                     return false
                 } else if (Time.time() !== lastCachedTime) {
-                    targets = {}
+                    accepts = {}
                 }
                 
                 var proximity = entity.proximity();
@@ -93,7 +93,7 @@ function entity(a) {
                     }
                 }
                 lastCachedTime = Time.time();
-                targets[item.id] = null;
+                accepts[item.id] = false;
                 return false
             },
             
