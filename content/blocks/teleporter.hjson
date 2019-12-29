@@ -1,0 +1,20 @@
+name: "Teleporter"
+
+description: "Advanced item transport block. Teleporters input items to other teleporters of the same color. Does nothing if no teleporters of the same color exist. If multiple teleporters exist of the same color, items are distributed evenly. Tap to change color."
+
+research: mass-driver
+category: distribution
+
+
+configurable: true
+update: true
+instantTransfer: true
+unloadable: false
+solid: true
+health: 160
+
+requirements: [ "silicon/150"
+				"metaglass/750"
+                "phase-fabric/250"
+				"surge-alloy/250"
+				]
