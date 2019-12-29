@@ -71,9 +71,9 @@ function entity(a) {
             },
             id() {return entity.id},
             tryToOutput(item, forReal) {
-                if (Time.time() === lastCachedTime) {
-                    if (targets[item.id] === null) return false
-                } else {
+                if (Time.time() === lastCachedTime && targets[item.id] === null) {
+                    return false
+                } else if (Time.time() !== lastCachedTime) {
                     targets = {}
                 }
                 
