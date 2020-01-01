@@ -33,7 +33,7 @@ function register(entity) {
 	for (var itemId in acceptingItems) {
 		if (colors[entity.colorCode()].length < items.size) {
 			var delta = items.size - colors[entity.colorCode()].length
-			for (var i = 0; i < delta; i++) colors[entity.colorCode()].push({ids: [], offset: 0})
+			for (var i = 0; i < delta; i++) colors[entity.colorCode()].push({ids: [], offset: 0, lastRefusal: 0})
 		}
 		colors[entity.colorCode()][acceptingItems[itemId]].ids.push(entity.id())
 	}
@@ -203,6 +203,8 @@ function Block__tryToOutput(item, myTile, forReal) {
     var peers = getPeers(entity(myTile), item)
 	if (peers === undefined) return false
 	
+	var now = Time.time()
+	if (peers.lastRefusal === now) return false
 	
     var length = peers.ids.length;
     for (var i = 0; i < length; i++) {
@@ -217,6 +219,7 @@ function Block__tryToOutput(item, myTile, forReal) {
             return true;
         }
     }
+	peers.lastRefusal = now
     return false;
 }
 var superInstance = new Block('teleporter-super')
