@@ -127,11 +127,11 @@ function entity(a) {
 				for (var i in _proximity) {
 					var block = _proximity[i].block();
 					print(block)
-					var acceptAll = block.group === BlockGroup.transportation && !block.instantTransfer
 					
-					print(block.group)
-					print(acceptAll)
-					var acceptMaterials = block instanceof StorageBlock && !(block instanceof LaunchPad || block instanceof CoreBlock)
+					var acceptMaterials = block instanceof LaunchPad || block instanceof CoreBlock
+					
+					var acceptAll = (block.group === BlockGroup.transportation && !block.instantTransfer) || (block instanceof StorageBlock && !acceptMaterials)
+					
 					
 					for (var i = 0; i < items.size; i++) {
 						print(i)
