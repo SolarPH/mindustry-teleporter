@@ -1,4 +1,5 @@
-// I apologize for this mess.
+var items = Vars.content.items()
+
 
 var colorRepresentations = [
     Color.blue, Color.red, Color.green, Color.white,
@@ -15,32 +16,47 @@ var colorIcons = colorRepresentations.map(function (color) {
 
 
 
-var entities = {};
 var colors;
 var registryVersion;
 function newRegistry() {
     colors = new Array(12);
     registryVersion = Time.time();
     for (var i = 0; i < 12; i++) {
-        colors[i] = {ids: [], offset: 0};
+        colors[i] = [];
     }
 }
-function registerColor(entity) {
+function register(entity) {
     if (entity.colorCode() == -1) return
-    colors[entity.colorCode()].ids.push(entity.id())
+	
+	const acceptingItems = entity.acceptingItems();
+	
+	for (var itemId in acceptingItems) {
+		if (colors[entity.colorCode()].length < items.size) {
+			var delta = items.size - colors[entity.colorCode()].length
+			for (var i = 0; i < delta; i++) colors[entity.colorCode()].push({ids: [], offset: 0})
+		}
+		colors[entity.colorCode()][acceptingItems[itemId]].ids.push(entity.id())
+	}
 }
-function unregisterColor(entity) {
+
+function unregister(entity) {
     if (entity.colorCode() == -1) return
-    var index = colors[entity.colorCode()].ids.indexOf(entity.id())
-    if (index === -1) return;
-    colors[entity.colorCode()].ids.splice(index, 1)
+	for (var i in colors[entity.colorCode()]) {
+		var index = colors[entity.colorCode()][i].ids.indexOf(entity.id())
+		if (index !== -1)
+			colors[entity.colorCode()][i].ids.splice(index, 1)
+	}
 }
+
 function gameReloadDetected() {
     if (registryVersion + 100 < Time.time()) {
         newRegistry()
     }
 }
 
+function getPeers(entity, item) {
+	return colors[entity.colorCode()][item.id]
+}
 newRegistry()
 
 
@@ -49,7 +65,7 @@ newRegistry()
 
 
 
-var lastColor = -1
+var entities = {};
 function entity(a) {
     var entity = a.ent()
     
@@ -60,27 +76,33 @@ function entity(a) {
         var initialized = false;
         var lastCachedTime = 0;
         var accepts = {}
+		var _colorCode = null
+		var _proximity = null
+		var needToRegisterAgain = false;
         entities[entity.id] = {
             realEntity: entity,
             
             init() {
                 if (!initialized) {
                     initialized = true
-                    registerColor(this)
+					needToRegisterAgain = true
                 }
             },
+			
             id() {return entity.id},
+			
             tryToOutput(item, forReal) {
+				
+				this.cacheProximity()
+				
                 if (Time.time() === lastCachedTime && accepts[item.id] === false) {
                     return false
                 } else if (Time.time() !== lastCachedTime) {
                     accepts = {}
                 }
                 
-                var proximity = entity.proximity();
-                const size = proximity.size;
-                for (var i = 0; i < size; i++) {
-                    var target = proximity.get((offset + i) % size)
+                for (var i = 0; i < _proximity.length; i++) {
+                    var target = _proximity[(offset + i) % _proximity.length]
                     
                     if (!target.block().instantTransfer && target.block().acceptItem(item, target, entity.tile)) {
                         if (forReal) {
@@ -96,20 +118,62 @@ function entity(a) {
                 accepts[item.id] = false;
                 return false
             },
-            
+			
+			acceptingItems() {
+				var accept = {}
+				
+				this.cacheProximity()
+				
+				for (var i in _proximity) {
+					var block = _proximity[i].block();
+					print(block)
+					var acceptAll = block.group === BlockGroup.transportation && !block.instantTransfer
+					
+					print(block.group)
+					print(acceptAll)
+					var acceptMaterials = block instanceof StorageBlock && !(block instanceof LaunchPad || block instanceof CoreBlock)
+					
+					for (var i = 0; i < items.size; i++) {
+						print(i)
+						if (acceptAll || (acceptMaterials && items.get(i).type === ItemType.material) || block.consumes.itemFilters.get(i))
+							accept[i] = true
+					}
+				}
+				
+				var ret = []
+				for (var i = 0; i < items.size; i++)
+					if (accept[i]) ret.push(i)
+				return ret
+			},
+			
+			cacheProximity() {
+				if (_proximity !== null) return
+				
+				_proximity = []
+				var proximity = entity.proximity();
+                const size = proximity.size;
+                
+				for (var i = 0; i < size; i++) {
+                    _proximity.push(proximity.get(i))
+                }
+			},
+			
+            onProximityUpdate(tile) {
+				needToRegisterAgain = true
+				_proximity = null;
+			},
+			
             removed() {
-                unregisterColor(this);
+                unregister(this);
             },
 
-
-            colorCode(colorCode) {
-                if (colorCode === undefined) {
-                    return entity.link
+            colorCode(value) {
+                if (value === undefined) {
+                    if (_colorCode == null) _colorCode = entity.link
+					return _colorCode
                 } else {
-                    unregisterColor(this)
-                    entity.link = colorCode
-                    registerColor(this)
-                    lastColor = colorCode
+                    lastColor = entity.link = _colorCode = value
+				needToRegisterAgain = true
                 }
             },
             
@@ -118,6 +182,12 @@ function entity(a) {
                     gameReloadDetected();
                     this.init()
                 }
+				
+				if (needToRegisterAgain) {
+					unregister(this)
+					register(this)
+					needToRegisterAgain = false
+				}
             }
         }
     }
@@ -128,22 +198,21 @@ function entityFromId (id) {
 }
 
 
-
-
-
-
+var lastColor = -1
 function Block__tryToOutput(item, myTile, forReal) {
-    if (entity(myTile).colorCode() === -1) return false;
-    var color = colors[entity(myTile).colorCode()]
-    var length = color.ids.length;
+    var peers = getPeers(entity(myTile), item)
+	if (peers === undefined) return false
+	
+	
+    var length = peers.ids.length;
     for (var i = 0; i < length; i++) {
-        var teleporter = entityFromId(color.ids[(i + color.offset) % length]);
+        var teleporter = entityFromId(peers.ids[(i + peers.offset) % length]);
         
         if (teleporter.tryToOutput(item, forReal)) {
             if (forReal) {
-                color.offset += i + 1;
+                peers.offset += i + 1;
             } else {
-                color.offset +=i 
+                peers.offset +=i 
             }
             return true;
         }
@@ -162,6 +231,11 @@ const teleporter = extendContent(Block, "teleporter", {
         return Block__tryToOutput(item, myTile, true);
     },
     
+	onProximityUpdate(tile) {
+		superInstance.onProximityUpdate(tile)
+		entity(tile).onProximityUpdate(tile)
+	},
+
     playerPlaced(tile) {
         entity(tile).init()
         tile.configure(lastColor)
@@ -170,7 +244,7 @@ const teleporter = extendContent(Block, "teleporter", {
     placed(tile) {
         entity(tile).init()
     },
-    
+
     removed(tile) {
         entity(tile).removed()
     },
@@ -178,6 +252,7 @@ const teleporter = extendContent(Block, "teleporter", {
     update(tile) {
         entity(tile).update()
     },
+	
     configured (tile, player, value){
         entity(tile).colorCode(value)
     },
